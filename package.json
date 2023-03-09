@@ -6,10 +6,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start:dev": "node index.js",
+    "start": "pm2 start index.js",
+    "stop": "pm2 stop index.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0",
-    "nodemon": "^2.0.21"
+    "nodemon": "^2.0.21",
+    "pm2": "^5.2.2"
   }
 }
