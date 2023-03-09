@@ -1,9 +1,8 @@
 const TelegramApi =  require("node-telegram-bot-api");
+
 const {gameOptions, againOptions} = require("./options");
-const Promise = require('bluebird');
-  Promise.config({
-    cancellation: true
-  });
+const sequelize = require("./db");
+const {User} = require("./models");
 
 const token = "6065903165:AAESpVxPXZjV01OIqA2bXBXYqHxY-4Gu2dk";
 
@@ -18,7 +17,16 @@ const startGame = async (chatId) => {
     await bot.sendMessage(chatId, `Пробуй відгадати. Скажу по секрету... я загадав число ${randomNumber}`, gameOptions);
 }
 
-const start = () => {
+const start = async () => {
+
+    try {
+        await sequelize.authenticate();
+        await sequelize.sync();
+        console.log("Successfully connected to database");
+    } catch (error) {
+        console.log("Error while connecting to database", error);
+    }
+
     bot.setMyCommands([
         { command: "/start", description: "Початок роботи з ботом"},
         { command: "/info", description: "Інформація про тебе"},
@@ -29,18 +37,29 @@ const start = () => {
         const text = message.text;
         const from = message.from;
         const chatId = message.chat.id;
-        
-        if (text === "/start") {
-            await bot.sendMessage(chatId, `Привіт ${from.first_name}! Асистент Гната радий тобі допомогти. Вибери команду в пункті "МЕНЮ"`);
-            return await bot.sendSticker(chatId, "CAACAgQAAxkBAAEeHxhkCNFOfKkMm55r6UFfj0qBmY64hwACjAoAAkeK-FCqyQVtegY39i4E")
-        } 
-        if (text === "/info") {
-            return await bot.sendMessage(chatId, `Інформація про тебе - ${from.first_name} ${from.last_name}`);
+
+        try {
+            if (text === "/start") {
+                const user = await User.findOne({chatId})
+                if (user) {
+                    return await bot.sendMessage(chatId, `Радий бачити вас знову, ${from.first_name}! Вибери команду в пункті "МЕНЮ"`);
+                } else {
+                    await User.create({chatId})
+                    await bot.sendMessage(chatId, `Привіт ${from.first_name}! Асистент Гната радий тобі допомогти. Вибери команду в пункті "МЕНЮ"`);
+                    return await bot.sendSticker(chatId, "CAACAgQAAxkBAAEeHxhkCNFOfKkMm55r6UFfj0qBmY64hwACjAoAAkeK-FCqyQVtegY39i4E")
+                }
+            } 
+            if (text === "/info") {
+                const user = await User.findOne({chatId})
+                return await bot.sendMessage(chatId, `Інформація про користувача: \n ${from.first_name} ${from.last_name}. \n ${user.right} - привильних відповідей та ${user.wrong} - неправильних в /game`);
+            }
+            if (text === "/game") {
+                return await startGame(chatId)
+            }
+            return await bot.sendMessage(chatId, `Не розумію вашого запитання`);
+        } catch (error) {
+            return await bot.sendMessage(chatId, "Сталась якась помилка")
         }
-        if (text === "/game") {
-            return await startGame(chatId)
-        }
-        return await bot.sendMessage(chatId, `Не розумію вашого запитання`);
     })
 
     bot.on("callback_query", async message => {
@@ -50,13 +69,16 @@ const start = () => {
         if (data === "/again") {
             return await startGame(chatId)
         }
-
+        const user = await User.findOne({chatId});
         if (data == chats[chatId]) {
+            user.right++;
             await bot.sendMessage(chatId, "Ви вгадали!!!", againOptions)
-            return await bot.sendSticker(chatId, "CAACAgIAAxkBAAEeH2JkCNs4rrWfpiygshFoKn_JmaaywgACBSUAAqBjsEvht8ooX7DfDS4E")
+            await bot.sendSticker(chatId, "CAACAgIAAxkBAAEeH2JkCNs4rrWfpiygshFoKn_JmaaywgACBSUAAqBjsEvht8ooX7DfDS4E")
         } else {
-            return await bot.sendMessage(chatId, `Ви вибрали цифру ${data}, але не вгадали 😢`, againOptions)
+            user.wrong++
+            await bot.sendMessage(chatId, `Ви вибрали цифру ${data}, але не вгадали 😢`, againOptions)
         }
+        await user.save();
     })
 }
 
