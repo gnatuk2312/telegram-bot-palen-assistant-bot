@@ -17,6 +17,18 @@ const startGame = async (chatId) => {
     await bot.sendMessage(chatId, `Пробуй відгадати. Скажу по секрету... я загадав число ${randomNumber}`, gameOptions);
 }
 
+const sendMessageToAllUsers = async () => {
+    const users = await  User.findAll();
+    users.forEach(user => {
+        const chatId = user.dataValues.chatId;
+        const lastName = user.dataValues.lastName;
+        const firstName = user.dataValues.firstName;
+
+        bot.sendMessage(chatId, `Привіт ${firstName}! Я можу написати тобі в будь який момент, навіть о 04:00 ранку. \n\nСкинь 100грн мені на карту: xxxx-xxxx-xxxx-xxxx і твій сон буде й надалі спокійним \n\n З повагою, асистент Гната.`)
+        bot.sendSticker(chatId, "CAACAgIAAxkBAAEeMJtkCxP1urTqJ2dZPOA5xVHuL2bWQAACYgADISmmG5dCydoH6MnGLwQ")
+    })
+}
+
 const start = async () => {
 
     try {
@@ -36,18 +48,27 @@ const start = async () => {
     bot.on("message", async (message) => {
         const text = message.text;
         const from = message.from;
+        const firstName = from.first_name;
+        const lastName = from.last_name;
         const chatId = message.chat.id;
 
         try {
             if (text === "/start") {
-                const user = await User.findOne({chatId})
+                const user = await User.findOne({where: {chatId: String(chatId)}});
                 if (user) {
-                    return await bot.sendMessage(chatId, `Радий бачити вас знову, ${from.first_name}! Вибери команду в пункті "МЕНЮ"`);
+                    await bot.sendMessage(chatId, `User exist`);
                 } else {
-                    await User.create({chatId})
-                    await bot.sendMessage(chatId, `Привіт ${from.first_name}! Асистент Гната радий тобі допомогти. Вибери команду в пункті "МЕНЮ"`);
-                    return await bot.sendSticker(chatId, "CAACAgQAAxkBAAEeHxhkCNFOfKkMm55r6UFfj0qBmY64hwACjAoAAkeK-FCqyQVtegY39i4E")
+                    await User.create({firstName, lastName, chatId})
+                    await bot.sendMessage(chatId, `User created`);
                 }
+                // const user = await User.findOne({ where: {chatId} })
+                // if (user) {
+                //     return await bot.sendMessage(chatId, `Радий бачити вас знову, ${user.dataValues.firstName}! Вибери команду в пункті "МЕНЮ"`);
+                // } else {
+                //     await User.create({firstName, lastName, chatId})
+                //     await bot.sendMessage(chatId, `Привіт ${from.first_name}! Асистент Гната радий тобі допомогти. Вибери команду в пункті "МЕНЮ"`);
+                //     return await bot.sendSticker(chatId, "CAACAgQAAxkBAAEeHxhkCNFOfKkMm55r6UFfj0qBmY64hwACjAoAAkeK-FCqyQVtegY39i4E")
+                // }
             } 
             if (text === "/info") {
                 const user = await User.findOne({chatId})
@@ -56,9 +77,9 @@ const start = async () => {
             if (text === "/game") {
                 return await startGame(chatId)
             }
-            return await bot.sendMessage(chatId, `Не розумію вашого запитання`);
+            // return await bot.sendMessage(chatId, `Не розумію вашого запитання`);
         } catch (error) {
-            return await bot.sendMessage(chatId, "Сталась якась помилка")
+            return await bot.sendMessage(chatId, `Сталась якась помилка ${JSON.stringify(error)}`)
         }
     })
 
